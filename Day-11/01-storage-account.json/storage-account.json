@@ -1,0 +1,175 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "location": {
+            "type": "string",
+            "defaultValue": "westus",
+            "metadata": {
+                "description": "Location for all resources"
+            }
+        },
+        "storageAccountName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the storage account"
+            },
+            "defaultValue": "Standard",
+            "allowedValues": [
+                "Standard",
+                "Premium"
+            ]
+        }
+    },
+    "functions": [],
+    "variables": {
+        "storageAccountType": "Standard_LRS",
+        "resouceName": "sukumaracct123"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2021-04-01",
+            "name": "[variables('resouceName')]",
+            "location": "[parameters('location')]",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "[parameters('storageAccountName')]"
+            },
+            "kind": "StorageV2",
+            "properties": {
+                "accessTier": "Hot",
+                "allowBlobPublicAccess": false,
+                "minimumTlsVersion": "TLS1_2",
+                "supportsHttpsTrafficOnly": true
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2021-07-01",
+            "name": "myVM",
+            "location": "[parameters('location')]",
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_B2s"
+                },
+                "osProfile": {
+                    "computerName": "myVM",
+                    "adminUsername": "azureuser",
+                    "adminPassword": "P@ssw0rd1234!"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "Canonical",
+                        "offer": "UbuntuServer",
+                        "sku": "18_04-lts-gen2",
+                        "version": "latest"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', 'myNIC')]"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Network/applicationGateways",
+            "apiVersion": "2021-02-01",
+            "name": "myAppGateway",
+            "location": "[parameters('location')]",
+            "properties": {
+            "sku": {
+                "name": "Standard_v2",
+                "tier": "Standard_v2",
+                "capacity": 2
+            },
+            "gatewayIPConfigurations": [
+                {
+                "name": "appGatewayIpConfig",
+                "properties": {
+                    "subnet": {
+                    "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', 'myVNet', 'appGatewaySubnet')]"
+                    }
+                }
+                }
+            ],
+            "frontendIPConfigurations": [
+                {
+                "name": "appGatewayFrontendIP",
+                "properties": {
+                    "publicIPAddress": {
+                    "id": "[resourceId('Microsoft.Network/publicIPAddresses', 'appGatewayPublicIP')]"
+                    }
+                }
+                }
+            ],
+            "frontendPorts": [
+                {
+                "name": "appGatewayFrontendPort",
+                "properties": {
+                    "port": 80
+                }
+                }
+            ],
+            "backendAddressPools": [
+                {
+                "name": "appGatewayBackendPool",
+                "properties": {
+                    "backendAddresses": []
+                }
+                }
+            ],
+            "backendHttpSettingsCollection": [
+                {
+                "name": "appGatewayBackendHttpSettings",
+                "properties": {
+                    "port": 80,
+                    "protocol": "Http",
+                    "cookieBasedAffinity": "Disabled"
+                }
+                }
+            ],
+            "httpListeners": [
+                {
+                "name": "appGatewayHttpListener",
+                "properties": {
+                    "frontendIPConfiguration": {
+                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', 'myAppGateway'), '/frontendIPConfigurations/appGatewayFrontendIP')]"
+                    },
+                    "frontendPort": {
+                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', 'myAppGateway'), '/frontendPorts/appGatewayFrontendPort')]"
+                    },
+                    "protocol": "Http"
+                }
+                }
+            ],
+            "requestRoutingRules": [
+                {
+                "name": "appGatewayRoutingRule",
+                "properties": {
+                    "ruleType": "Basic",
+                    "httpListener": {
+                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', 'myAppGateway'), '/httpListeners/appGatewayHttpListener')]"
+                    },
+                    "backendAddressPool": {
+                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', 'myAppGateway'), '/backendAddressPools/appGatewayBackendPool')]"
+                    },
+                    "backendHttpSettings": {
+                    "id": "[concat(resourceId('Microsoft.Network/applicationGateways', 'myAppGateway'), '/backendHttpSettingsCollection/appGatewayBackendHttpSettings')]"
+                    }
+                }
+                }
+            ]
+            }
+        }
+    ],
+    "outputs": {
+        "storageAccountId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+        }
+    }
+}
